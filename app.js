@@ -379,10 +379,11 @@ function buildPdfBlob(lines) {
   return new Blob([pdf], { type: "application/pdf" });
 }
 
-function getReportBaseName() {
+function getReportFileName() {
   var n0 = document.getElementById("teamName0").value.trim();
   var n1 = document.getElementById("teamName1").value.trim();
-  return scoutingMode ? safeFileName(n0 + "_vs_" + n1) : safeFileName(n0);
+  var base = scoutingMode ? safeFileName(n0 + "_vs_" + n1) : safeFileName(n0);
+  return base + "_" + todayStamp() + ".pdf";
 }
 
 function downloadBlob(blob, filename) {
@@ -413,7 +414,7 @@ function openBlob(blob) {
 }
 
 function exportPDF() {
-  var filename = getReportBaseName() + "_serve_receive_" + todayStamp() + ".pdf";
+  var filename = getReportFileName();
   var blob = buildPdfBlob(makePdfLines());
   var file = new File([blob], filename, { type: "application/pdf" });
   var isAndroid = /Android/i.test(navigator.userAgent);
