@@ -1,0 +1,10 @@
+{
+  "name": "Volleyball Opponent Tracker",
+  "short_name": "VB Tracker",
+  "description": "Track volleyball serve receive ratings and identify the best serve targets.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#fafafa",
+  "icons": []
+}
