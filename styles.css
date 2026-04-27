@@ -250,6 +250,15 @@ button {
   color: #444;
 }
 
+.history.latestEntry {
+  color: #b00020;
+  font-weight: bold;
+}
+
+.history.latestEntry .historyLabel {
+  color: #b00020;
+}
+
 .bottomBar {
   position: sticky;
   bottom: 0;
@@ -275,13 +284,6 @@ button {
   font-weight: bold;
 }
 
-.note {
-  font-size: 11px;
-  color: #555;
-  margin: 5px 0 48px 0;
-  line-height: 1.2;
-}
-
 @media (min-width: 760px) {
   .playerRow {
     grid-template-columns: 70px 245px 1fr;
@@ -302,7 +304,7 @@ button {
 }
 
 @media print {
-  .modeBox, .addRow, .bottomBar, .note {
+  .modeBox, .addRow, .bottomBar {
     display: none !important;
   }
 

@@ -6,6 +6,8 @@ var teams = [
 var actionHistory = [];
 var STORAGE_KEY = "volleyballOpponentTracker_v1";
 var resetConfirmTimer = null;
+var latestEntryTimers = {};
+var latestEntryKeys = {};
 
 function saveState() {
   try {
@@ -115,8 +117,25 @@ function addPlayer(teamIndex, isLibero) {
 function record(teamIndex, player, value) {
   teams[teamIndex].players[player].scores.push(value);
   actionHistory.push({ teamIndex: teamIndex, player: player, value: value });
+  flashLatestEntry(teamIndex, player, value);
   renderTeam(teamIndex);
   saveState();
+}
+
+function latestEntryKey(teamIndex, player) {
+  return teamIndex + ":" + player;
+}
+
+function flashLatestEntry(teamIndex, player, value) {
+  var key = latestEntryKey(teamIndex, player);
+  latestEntryKeys[key] = value;
+
+  clearTimeout(latestEntryTimers[key]);
+  latestEntryTimers[key] = setTimeout(function() {
+    delete latestEntryKeys[key];
+    delete latestEntryTimers[key];
+    renderTeam(teamIndex);
+  }, 1000);
 }
 
 function undoLast() {
@@ -217,8 +236,12 @@ function renderTeam(teamIndex) {
     });
 
     var history = document.createElement("div");
-    history.className = "history";
-    history.innerHTML = "<span class='historyLabel'>Hist: </span>" +
+    var latestValue = latestEntryKeys[latestEntryKey(teamIndex, p)];
+    var hasLatestEntry = latestValue !== undefined;
+    history.className = "history" + (hasLatestEntry ? " latestEntry" : "");
+    history.innerHTML = hasLatestEntry
+      ? "<span class='historyLabel'>Latest entry: </span>" + escapeHTML(latestValue)
+      : "<span class='historyLabel'>Hist: </span>" +
       (player.scores.length ? player.scores.join(", ") : "—");
 
     row.appendChild(playerInfo);
