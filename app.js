@@ -5,6 +5,7 @@ var teams = [
 ];
 var actionHistory = [];
 var STORAGE_KEY = "volleyballOpponentTracker_v1";
+var resetConfirmTimer = null;
 
 function saveState() {
   try {
@@ -366,6 +367,7 @@ function downloadBlob(blob, filename) {
   var url = URL.createObjectURL(blob);
   a.href = url;
   a.download = filename;
+  a.target = "_blank";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -374,17 +376,36 @@ function downloadBlob(blob, filename) {
   }, 1000);
 }
 
+function openBlob(blob) {
+  var url = URL.createObjectURL(blob);
+  var opened = window.open(url, "_blank");
+
+  if (!opened) {
+    window.location.href = url;
+  }
+
+  setTimeout(function() {
+    URL.revokeObjectURL(url);
+  }, 60000);
+}
+
 function exportPDF() {
   var filename = getReportBaseName() + "_serve_receive_" + todayStamp() + ".pdf";
   var blob = buildPdfBlob(makePdfLines());
   var file = new File([blob], filename, { type: "application/pdf" });
+  var isAndroid = /Android/i.test(navigator.userAgent);
+
+  if (isAndroid) {
+    openBlob(blob);
+    return;
+  }
 
   if (navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) {
     navigator.share({
       files: [file],
       title: "Volleyball scouting report"
     }).catch(function(err) {
-      if (!err || err.name !== "AbortError") downloadBlob(blob, filename);
+      if (!err || err.name !== "AbortError") openBlob(blob);
     });
     return;
   }
@@ -393,7 +414,24 @@ function exportPDF() {
 }
 
 function resetAll() {
-  if (!confirm("Reset all teams, players, and scores?")) return;
+  var resetBtn = document.getElementById("resetBtn");
+
+  if (!resetBtn.classList.contains("confirmReset")) {
+    resetBtn.classList.add("confirmReset");
+    resetBtn.textContent = "Confirm";
+
+    clearTimeout(resetConfirmTimer);
+    resetConfirmTimer = setTimeout(function() {
+      resetBtn.classList.remove("confirmReset");
+      resetBtn.textContent = "Reset";
+    }, 3500);
+
+    return;
+  }
+
+  clearTimeout(resetConfirmTimer);
+  resetBtn.classList.remove("confirmReset");
+  resetBtn.textContent = "Reset";
 
   teams = [
     { players: {} },
