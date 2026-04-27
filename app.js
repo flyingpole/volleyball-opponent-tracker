@@ -234,67 +234,162 @@ function renderAll() {
   renderTeam(1);
 }
 
-function exportCSV() {
-  var csv = "Date," + todayStamp() + "\n";
-  csv += "Scouting Mode," + (scoutingMode ? "Yes" : "No") + "\n\n";
+function makePdfLines() {
+  var lines = [
+    "Volleyball Opponent Tracker",
+    "Date: " + todayStamp(),
+    "Scouting mode: " + (scoutingMode ? "2 teams" : "1 team"),
+    ""
+  ];
 
   for (var i = 0; i < visibleTeamCount(); i++) {
-    var name = document.getElementById("teamName" + i).value.trim();
-    csv += (i === 0 ? "Team 1" : "Team 2") + "," + '"' + name.replace(/"/g, '""') + '"' + "\n";
-    csv += "Team Average," + teamAvg(i) + "\n";
-    csv += "Player,Role,History,Average\n";
+    var name = document.getElementById("teamName" + i).value.trim() || (i === 0 ? "Team 1" : "Team 2");
+    lines.push((i === 0 ? "Team 1: " : "Team 2: ") + name);
+    lines.push("Team average: " + teamAvg(i));
+
+    var targets = getLowestAverageRanks(i);
+    if (targets.length) {
+      lines.push("Best serve targets:");
+      targets.forEach(function(entry, index) {
+        lines.push("  " + (index + 1) + ". #" + entry.playerKey + " - " + entry.average.toFixed(2));
+      });
+    }
+
+    lines.push("");
+    lines.push("Player        Role        Avg     History");
+    lines.push("-----------------------------------------------");
 
     sortPlayers(i).forEach(function(p) {
-      csv += p + "," +
-        (teams[i].players[p].isLibero ? "Libero" : "Player") +
-        ',"' + teams[i].players[p].scores.join(" ") + '",' +
-        avg(teams[i].players[p].scores) + "\n";
+      var player = teams[i].players[p];
+      var role = player.isLibero ? "Libero" : "Player";
+      lines.push(
+        padRight("#" + p, 13) +
+        padRight(role, 12) +
+        padRight(avg(player.scores), 8) +
+        (player.scores.length ? player.scores.join(", ") : "-")
+      );
     });
 
-    csv += "\n";
+    lines.push("");
   }
 
-  var n0 = document.getElementById("teamName0").value.trim();
-  var n1 = document.getElementById("teamName1").value.trim();
-  var base = scoutingMode ? safeFileName(n0 + "_vs_" + n1) : safeFileName(n0);
-
-  downloadText(csv, base + "_serve_receive_" + todayStamp() + ".csv", "text/csv");
+  return lines;
 }
 
-function saveJSON() {
-  var data = {
-    date: todayStamp(),
-    scoutingMode: scoutingMode,
-    teamNames: [
-      document.getElementById("teamName0").value.trim(),
-      document.getElementById("teamName1").value.trim()
-    ],
-    teams: teams,
-    actionHistory: actionHistory
-  };
-
-  var n0 = document.getElementById("teamName0").value.trim();
-  var n1 = document.getElementById("teamName1").value.trim();
-  var base = scoutingMode ? safeFileName(n0 + "_vs_" + n1) : safeFileName(n0);
-
-  downloadText(
-    JSON.stringify(data, null, 2),
-    base + "_serve_receive_match_" + todayStamp() + ".json",
-    "application/json"
-  );
+function padRight(text, width) {
+  text = String(text);
+  while (text.length < width) text += " ";
+  return text;
 }
 
-function downloadText(text, filename, type) {
-  var blob = new Blob([text], { type: type });
+function pdfEscape(text) {
+  return String(text)
+    .replace(/[^\x20-\x7E]/g, "-")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+}
+
+function buildPdfBlob(lines) {
+  var pageWidth = 612;
+  var pageHeight = 792;
+  var margin = 46;
+  var lineHeight = 16;
+  var linesPerPage = Math.floor((pageHeight - margin * 2) / lineHeight);
+  var pages = [];
+
+  for (var i = 0; i < lines.length; i += linesPerPage) {
+    pages.push(lines.slice(i, i + linesPerPage));
+  }
+
+  if (!pages.length) pages.push(["No scouting data yet."]);
+
+  var objects = [];
+  var pageRefs = [];
+  var fontObjectNumber = 3 + (pages.length * 2);
+
+  objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+  objects[2] = "<< /Type /Pages /Kids [" + pages.map(function(_, index) {
+    return (3 + index * 2) + " 0 R";
+  }).join(" ") + "] /Count " + pages.length + " >>";
+
+  pages.forEach(function(pageLines, index) {
+    var pageObjectNumber = 3 + index * 2;
+    var contentObjectNumber = pageObjectNumber + 1;
+    pageRefs.push(pageObjectNumber + " 0 R");
+
+    var content = "BT\n/F1 11 Tf\n" + margin + " " + (pageHeight - margin) + " Td\n";
+    pageLines.forEach(function(line, lineIndex) {
+      if (lineIndex > 0) content += "0 -" + lineHeight + " Td\n";
+      content += "(" + pdfEscape(line) + ") Tj\n";
+    });
+    content += "ET";
+
+    objects[pageObjectNumber] =
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pageWidth + " " + pageHeight + "] " +
+      "/Resources << /Font << /F1 " + fontObjectNumber + " 0 R >> >> " +
+      "/Contents " + contentObjectNumber + " 0 R >>";
+    objects[contentObjectNumber] =
+      "<< /Length " + content.length + " >>\nstream\n" + content + "\nendstream";
+  });
+
+  objects[fontObjectNumber] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+
+  var pdf = "%PDF-1.4\n";
+  var offsets = [0];
+  for (var objectNumber = 1; objectNumber < objects.length; objectNumber++) {
+    if (!objects[objectNumber]) continue;
+    offsets[objectNumber] = pdf.length;
+    pdf += objectNumber + " 0 obj\n" + objects[objectNumber] + "\nendobj\n";
+  }
+
+  var xrefOffset = pdf.length;
+  pdf += "xref\n0 " + objects.length + "\n";
+  pdf += "0000000000 65535 f \n";
+  for (var x = 1; x < objects.length; x++) {
+    pdf += String(offsets[x]).padStart(10, "0") + " 00000 n \n";
+  }
+  pdf += "trailer\n<< /Size " + objects.length + " /Root 1 0 R >>\n";
+  pdf += "startxref\n" + xrefOffset + "\n%%EOF";
+
+  return new Blob([pdf], { type: "application/pdf" });
+}
+
+function getReportBaseName() {
+  var n0 = document.getElementById("teamName0").value.trim();
+  var n1 = document.getElementById("teamName1").value.trim();
+  return scoutingMode ? safeFileName(n0 + "_vs_" + n1) : safeFileName(n0);
+}
+
+function downloadBlob(blob, filename) {
   var a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  var url = URL.createObjectURL(blob);
+  a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   setTimeout(function() {
-    URL.revokeObjectURL(a.href);
+    URL.revokeObjectURL(url);
   }, 1000);
+}
+
+function exportPDF() {
+  var filename = getReportBaseName() + "_serve_receive_" + todayStamp() + ".pdf";
+  var blob = buildPdfBlob(makePdfLines());
+  var file = new File([blob], filename, { type: "application/pdf" });
+
+  if (navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) {
+    navigator.share({
+      files: [file],
+      title: "Volleyball scouting report"
+    }).catch(function(err) {
+      if (!err || err.name !== "AbortError") downloadBlob(blob, filename);
+    });
+    return;
+  }
+
+  downloadBlob(blob, filename);
 }
 
 function resetAll() {
@@ -335,9 +430,7 @@ document.getElementById("playerInput1").addEventListener("keydown", function(e) 
 });
 
 document.getElementById("undoBtn").addEventListener("click", undoLast);
-document.getElementById("csvBtn").addEventListener("click", exportCSV);
-document.getElementById("jsonBtn").addEventListener("click", saveJSON);
-document.getElementById("printBtn").addEventListener("click", function() { window.print(); });
+document.getElementById("printBtn").addEventListener("click", exportPDF);
 document.getElementById("resetBtn").addEventListener("click", resetAll);
 
 loadState();
