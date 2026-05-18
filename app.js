@@ -111,6 +111,7 @@ function addPlayer(teamIndex, isLibero) {
 
   input.value = "";
   renderTeam(teamIndex);
+  renderSummary();
   saveState();
 }
 
@@ -119,6 +120,7 @@ function record(teamIndex, player, value) {
   actionHistory.push({ teamIndex: teamIndex, player: player, value: value });
   flashLatestEntry(teamIndex, player, value);
   renderTeam(teamIndex);
+  renderSummary();
   saveState();
 }
 
@@ -147,6 +149,7 @@ function undoLast() {
   }
 
   renderTeam(last.teamIndex);
+  renderSummary();
   saveState();
 }
 
@@ -174,18 +177,31 @@ function teamAvg(teamIndex) {
 function getLowestAverageRanks(teamIndex) {
   var players = teams[teamIndex].players;
 
+  return getWorstPassingRanks(teamIndex).slice(0, 3);
+}
+
+function getWorstPassingRanks(teamIndex) {
+  var players = teams[teamIndex].players;
+
   return Object.keys(players)
     .filter(function(playerKey) {
       return players[playerKey].scores.length > 0;
     })
     .map(function(playerKey) {
+      var scores = players[playerKey].scores;
+      var zeroCount = scores.filter(function(score) { return score === 0; }).length;
+
       return {
         playerKey: playerKey,
-        average: parseFloat(avg(players[playerKey].scores))
+        average: parseFloat(avg(scores)),
+        zeroPct: zeroCount / scores.length,
+        zeroCount: zeroCount,
+        attempts: scores.length
       };
     })
     .sort(function(a, b) {
       if (a.average !== b.average) return a.average - b.average;
+      if (a.zeroPct !== b.zeroPct) return b.zeroPct - a.zeroPct;
 
       var aNum = parseInt(a.playerKey, 10);
       var bNum = parseInt(b.playerKey, 10);
@@ -193,7 +209,7 @@ function getLowestAverageRanks(teamIndex) {
 
       return String(a.playerKey).localeCompare(String(b.playerKey), undefined, { numeric: true });
     })
-    .slice(0, 3);
+    ;
 }
 
 function renderTeam(teamIndex) {
@@ -256,6 +272,50 @@ function renderAll() {
   document.getElementById("team0Label").textContent = scoutingMode ? "Team 1" : "Team";
   renderTeam(0);
   renderTeam(1);
+  renderSummary();
+}
+
+function renderSummary() {
+  var panel = document.getElementById("summaryPanel");
+  panel.innerHTML = "";
+
+  var title = document.createElement("div");
+  title.className = "summaryTitle";
+  title.textContent = "Worst Passing Summary";
+  panel.appendChild(title);
+
+  for (var i = 0; i < visibleTeamCount(); i++) {
+    var teamName = document.getElementById("teamName" + i).value.trim() || (i === 0 ? "Team 1" : "Team 2");
+    var ranks = getWorstPassingRanks(i);
+    var section = document.createElement("div");
+    section.className = "summaryTeam";
+
+    var heading = document.createElement("div");
+    heading.className = "summaryTeamName";
+    heading.textContent = teamName;
+    section.appendChild(heading);
+
+    if (!ranks.length) {
+      var empty = document.createElement("div");
+      empty.className = "summaryEmpty";
+      empty.textContent = "No passing scores yet.";
+      section.appendChild(empty);
+    } else {
+      ranks.forEach(function(entry, index) {
+        var row = document.createElement("div");
+        row.className = "summaryRow";
+        row.innerHTML =
+          "<span class='summaryRank'>" + (index + 1) + "</span>" +
+          "<span class='summaryPlayer'>#" + escapeHTML(entry.playerKey) + "</span>" +
+          "<span class='summaryAvg'>Avg " + entry.average.toFixed(2) + "</span>" +
+          "<span class='summaryZeros'>0s " + Math.round(entry.zeroPct * 100) + "%</span>" +
+          "<span class='summaryAttempts'>" + entry.attempts + " passes</span>";
+        section.appendChild(row);
+      });
+    }
+
+    panel.appendChild(section);
+  }
 }
 
 function makePdfLines() {
@@ -480,8 +540,14 @@ document.getElementById("addLibero0").addEventListener("click", function() { add
 document.getElementById("addPlayer1").addEventListener("click", function() { addPlayer(1, false); });
 document.getElementById("addLibero1").addEventListener("click", function() { addPlayer(1, true); });
 
-document.getElementById("teamName0").addEventListener("input", saveState);
-document.getElementById("teamName1").addEventListener("input", saveState);
+document.getElementById("teamName0").addEventListener("input", function() {
+  renderSummary();
+  saveState();
+});
+document.getElementById("teamName1").addEventListener("input", function() {
+  renderSummary();
+  saveState();
+});
 
 document.getElementById("playerInput0").addEventListener("keydown", function(e) {
   if (e.key === "Enter") addPlayer(0, false);

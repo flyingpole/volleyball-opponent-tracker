@@ -259,6 +259,78 @@ button {
   color: #b00020;
 }
 
+.summaryPanel {
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: white;
+  padding: 6px;
+  margin-bottom: 8px;
+}
+
+.summaryTitle {
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.summaryTeam {
+  border-top: 1px solid #ddd;
+  padding-top: 5px;
+  margin-top: 5px;
+}
+
+.summaryTeam:first-of-type {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.summaryTeamName {
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.summaryRow {
+  display: grid;
+  grid-template-columns: 24px 54px 72px 64px 1fr;
+  gap: 4px;
+  align-items: center;
+  min-height: 28px;
+  border-top: 1px solid #eee;
+  font-size: 12px;
+}
+
+.summaryRow:first-of-type {
+  border-top: none;
+}
+
+.summaryRank {
+  font-weight: bold;
+  text-align: center;
+}
+
+.summaryPlayer {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.summaryAvg,
+.summaryZeros,
+.summaryAttempts {
+  white-space: nowrap;
+}
+
+.summaryZeros {
+  color: #b00020;
+  font-weight: bold;
+}
+
+.summaryEmpty {
+  color: #555;
+  font-size: 12px;
+}
+
 .bottomBar {
   position: sticky;
   bottom: 0;
